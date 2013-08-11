@@ -1,5 +1,5 @@
 # coding: utf-8
-require 'rubysl/openssl/version'
+require './lib/rubysl/openssl/version'
 
 Gem::Specification.new do |spec|
   spec.name          = "rubysl-openssl"
