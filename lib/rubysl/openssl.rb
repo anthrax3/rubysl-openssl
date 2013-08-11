@@ -1,7 +1,2 @@
-require "rubysl-openssl/version"
-
-module RubySL
-  module Openssl
-    # Your code goes here...
-  end
-end
+require "rubysl/openssl/version"
+require "rubysl/openssl/openssl"
