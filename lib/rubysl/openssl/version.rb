@@ -1,5 +1,5 @@
 module RubySL
-  module Openssl
-    VERSION = "0.0.1"
+  module OpenSSL
+    VERSION = "2.0.0"
   end
 end
