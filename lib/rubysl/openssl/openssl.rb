@@ -14,7 +14,7 @@
   $Id$
 =end
 
-require 'openssl/ext/openssl'
+require_relative '../../../ext/rubysl/openssl/openssl'
 
 require 'openssl/bn'
 require 'openssl/cipher'
