@@ -1,5 +1,5 @@
 # coding: utf-8
-require 'rubysl/openssl/version'
+require './lib/rubysl/openssl/version'
 
 Gem::Specification.new do |spec|
   spec.name          = "rubysl-openssl"
@@ -16,8 +16,6 @@ Gem::Specification.new do |spec|
   spec.extensions    = ["ext/rubysl/openssl/extconf.rb"]
   spec.test_files    = spec.files.grep(%r{^(test|spec|features)/})
   spec.require_paths = ["lib"]
-
-  spec.add_runtime_dependency "redcard", "~> 1.0"
 
   spec.add_development_dependency "bundler", "~> 1.3"
   spec.add_development_dependency "rake", "~> 10.0"
