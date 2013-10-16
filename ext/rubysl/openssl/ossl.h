@@ -28,6 +28,7 @@ extern "C" {
 #if defined(RFILE) /*&& !defined(OSSL_DEBUG)*/
 #  undef RFILE
 #endif
+#define RSTRING_NOT_MODIFIED 1
 #include <ruby.h>
 #include <ruby/io.h>
 #include <ruby/thread.h>
