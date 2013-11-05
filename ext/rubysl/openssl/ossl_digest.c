@@ -296,8 +296,6 @@ ossl_digest_block_length(VALUE self)
 void
 Init_ossl_digest()
 {
-    rb_require("digest");
-
 #if 0
     mOSSL = rb_define_module("OpenSSL"); /* let rdoc know about mOSSL */
 #endif
