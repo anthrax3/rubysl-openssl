@@ -14,6 +14,8 @@
   $Id$
 =end
 
+require 'digest'
+
 require 'openssl/openssl'
 require 'openssl/bn'
 require 'openssl/cipher'
