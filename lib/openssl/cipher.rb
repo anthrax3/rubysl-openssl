@@ -58,7 +58,7 @@ module OpenSSL
     end
 
     # This class is only provided for backwards compatibility.  Use OpenSSL::Cipher in the future.
-    class Cipher < Cipher
+    class Cipher < ::OpenSSL::Cipher
       # add warning
     end
   end # Cipher

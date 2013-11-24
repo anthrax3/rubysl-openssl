@@ -60,7 +60,7 @@ module OpenSSL
     }
 
     # This class is only provided for backwards compatibility.  Use OpenSSL::Digest in the future.
-    class Digest < Digest
+    class Digest < ::OpenSSL::Digest
       def initialize(*args)
         # add warning
         super(*args)
