@@ -15,6 +15,7 @@
 =end
 
 require 'thread'
+require "digest"
 require 'openssl/openssl'
 
 require 'openssl/bn'
