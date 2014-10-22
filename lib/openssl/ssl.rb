@@ -20,19 +20,52 @@ require "fcntl"
 module OpenSSL
   module SSL
     class SSLContext
-      options = OpenSSL::SSL::OP_ALL
-      if defined?(OpenSSL::SSL::OP_DONT_INSERT_EMPTY_FRAGMENTS)
-        options &= ~OpenSSL::SSL::OP_DONT_INSERT_EMPTY_FRAGMENTS
-      end
-      if defined?(OpenSSL::SSL::OP_NO_COMPRESSION)
-        options |= OpenSSL::SSL::OP_NO_COMPRESSION
-      end
-
       DEFAULT_PARAMS = {
         :ssl_version => "SSLv23",
         :verify_mode => OpenSSL::SSL::VERIFY_PEER,
-        :ciphers => "DEFAULT:!aNULL:!eNULL:!LOW:!EXPORT:!SSLv2:!ADH",
-        :options => options,
+        :ciphers => %w{
+          ECDHE-ECDSA-AES128-GCM-SHA256
+          ECDHE-RSA-AES128-GCM-SHA256
+          ECDHE-ECDSA-AES256-GCM-SHA384
+          ECDHE-RSA-AES256-GCM-SHA384
+          DHE-RSA-AES128-GCM-SHA256
+          DHE-DSS-AES128-GCM-SHA256
+          DHE-RSA-AES256-GCM-SHA384
+          DHE-DSS-AES256-GCM-SHA384
+          ECDHE-ECDSA-AES128-SHA256
+          ECDHE-RSA-AES128-SHA256
+          ECDHE-ECDSA-AES128-SHA
+          ECDHE-RSA-AES128-SHA
+          ECDHE-ECDSA-AES256-SHA384
+          ECDHE-RSA-AES256-SHA384
+          ECDHE-ECDSA-AES256-SHA
+          ECDHE-RSA-AES256-SHA
+          DHE-RSA-AES128-SHA256
+          DHE-RSA-AES256-SHA256
+          DHE-RSA-AES128-SHA
+          DHE-RSA-AES256-SHA
+          DHE-DSS-AES128-SHA256
+          DHE-DSS-AES256-SHA256
+          DHE-DSS-AES128-SHA
+          DHE-DSS-AES256-SHA
+          AES128-GCM-SHA256
+          AES256-GCM-SHA384
+          AES128-SHA256
+          AES256-SHA256
+          AES128-SHA
+          AES256-SHA
+          ECDHE-ECDSA-RC4-SHA
+          ECDHE-RSA-RC4-SHA
+          RC4-SHA
+        }.join(":"),
+        :options => -> {
+          opts = OpenSSL::SSL::OP_ALL
+          opts &= ~OpenSSL::SSL::OP_DONT_INSERT_EMPTY_FRAGMENTS if defined?(OpenSSL::SSL::OP_DONT_INSERT_EMPTY_FRAGMENTS)
+          opts |= OpenSSL::SSL::OP_NO_COMPRESSION if defined?(OpenSSL::SSL::OP_NO_COMPRESSION)
+          opts |= OpenSSL::SSL::OP_NO_SSLv2 if defined?(OpenSSL::SSL::OP_NO_SSLv2)
+          opts |= OpenSSL::SSL::OP_NO_SSLv3 if defined?(OpenSSL::SSL::OP_NO_SSLv3)
+          opts
+        }.call
       }
 
       DEFAULT_CERT_STORE = OpenSSL::X509::Store.new
@@ -154,10 +187,16 @@ module OpenSSL
       end
     end
 
+    ##
+    # SSLServer represents a TCP/IP server socket with Secure Sockets Layer.
     class SSLServer
       include SocketForwarder
+      # When true then #accept works exactly the same as TCPServer#accept
       attr_accessor :start_immediately
 
+      # Creates a new instance of SSLServer.
+      # * +srv+ is an instance of TCPServer.
+      # * +ctx+ is an instance of OpenSSL::SSL::SSLContext.
       def initialize(svr, ctx)
         @svr = svr
         @ctx = ctx
@@ -170,20 +209,27 @@ module OpenSSL
         @start_immediately = true
       end
 
+      # Returns the TCPServer passed to the SSLServer when initialized.
       def to_io
         @svr
       end
 
+      # See TCPServer#listen for details.
       def listen(backlog=5)
         @svr.listen(backlog)
       end
 
+      # See BasicSocket#shutdown for details.
       def shutdown(how=Socket::SHUT_RDWR)
         @svr.shutdown(how)
       end
 
+      # Works similar to TCPServer#accept.
       def accept
-        sock = @svr.accept
+        # Socket#accept returns [socket, addrinfo].
+        # TCPServer#accept returns a socket.
+        # The following comma strips addrinfo.
+        sock, = @svr.accept
         begin
           ssl = OpenSSL::SSL::SSLSocket.new(sock, @ctx)
           ssl.sync_close = true
@@ -195,6 +241,7 @@ module OpenSSL
         end
       end
 
+      # See IO#close for details.
       def close
         @svr.close
       end

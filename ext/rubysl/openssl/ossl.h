@@ -28,7 +28,6 @@ extern "C" {
 #if defined(RFILE) /*&& !defined(OSSL_DEBUG)*/
 #  undef RFILE
 #endif
-#define RSTRING_NOT_MODIFIED 1
 #include <ruby.h>
 #include <ruby/io.h>
 #include <ruby/thread.h>
@@ -67,7 +66,7 @@ extern "C" {
 #include <openssl/conf_api.h>
 #undef X509_NAME
 #undef PKCS7_SIGNER_INFO
-#if defined(HAVE_OPENSSL_ENGINE_H) && defined(HAVE_ST_ENGINE)
+#if defined(HAVE_OPENSSL_ENGINE_H) && defined(HAVE_EVP_CIPHER_CTX_ENGINE)
 #  define OSSL_ENGINE_ENABLED
 #  include <openssl/engine.h>
 #endif
@@ -97,14 +96,14 @@ extern VALUE eOSSLError;
 #define OSSL_Check_Kind(obj, klass) do {\
   if (!rb_obj_is_kind_of((obj), (klass))) {\
     ossl_raise(rb_eTypeError, "wrong argument (%s)! (Expected kind of %s)",\
-               rb_obj_classname(obj), rb_class2name(klass));\
+               rb_obj_classname(obj), RSTRING_PTR(rb_class_name(klass)));\
   }\
 } while (0)
 
 #define OSSL_Check_Instance(obj, klass) do {\
   if (!rb_obj_is_instance_of((obj), (klass))) {\
     ossl_raise(rb_eTypeError, "wrong argument (%s)! (Expected instance of %s)",\
-               rb_obj_classname(obj), rb_class2name(klass));\
+               rb_obj_classname(obj), RSTRING_PTR(rb_class_name(klass)));\
   }\
 } while (0)
 

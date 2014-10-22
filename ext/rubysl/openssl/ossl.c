@@ -293,10 +293,9 @@ ossl_to_der_if_possible(VALUE obj)
 static VALUE
 ossl_make_error(VALUE exc, const char *fmt, va_list args)
 {
-    char buf[BUFSIZ];
+    VALUE str = Qnil;
     const char *msg;
     long e;
-    int len = 0;
 
 #ifdef HAVE_ERR_PEEK_LAST_ERROR
     e = ERR_peek_last_error();
@@ -304,14 +303,20 @@ ossl_make_error(VALUE exc, const char *fmt, va_list args)
     e = ERR_peek_error();
 #endif
     if (fmt) {
-	len = vsnprintf(buf, BUFSIZ, fmt, args);
+	str = rb_sprintf(fmt, args);
     }
-    if (len < BUFSIZ && e) {
+    if (e) {
 	if (dOSSL == Qtrue) /* FULL INFO */
 	    msg = ERR_error_string(e, NULL);
 	else
 	    msg = ERR_reason_error_string(e);
-	len += snprintf(buf+len, BUFSIZ-len, "%s%s", (len ? ": " : ""), msg);
+	if (NIL_P(str)) {
+	    if (msg) str = rb_str_new_cstr(msg);
+	}
+	else {
+	    if (RSTRING_LEN(str)) rb_str_cat2(str, ": ");
+	    rb_str_cat2(str, msg ? msg : "(null)");
+	}
     }
     if (dOSSL == Qtrue){ /* show all errors on the stack */
 	while ((e = ERR_get_error()) != 0){
@@ -320,8 +325,8 @@ ossl_make_error(VALUE exc, const char *fmt, va_list args)
     }
     ERR_clear_error();
 
-    if(len > BUFSIZ) len = rb_long2int(strlen(buf));
-    return rb_exc_new(exc, buf, len);
+    if (NIL_P(str)) str = rb_str_new(0, 0);
+    return rb_exc_new3(exc, str);
 }
 
 void
@@ -461,33 +466,89 @@ ossl_fips_mode_set(VALUE self, VALUE enabled)
 /**
  * Stores locks needed for OpenSSL thread safety
  */
-static VALUE* ossl_locks;
+#include "ruby/thread_native.h"
+static rb_nativethread_lock_t *ossl_locks;
 
-static void ossl_lock_callback(int mode, int type, char *file, int line)
+static void
+ossl_lock_unlock(int mode, rb_nativethread_lock_t *lock)
 {
-  if (mode & CRYPTO_LOCK) {
-    rb_mutex_lock(ossl_locks[type]);
-  } else {
-    rb_mutex_unlock(ossl_locks[type]);
-  }
+    if (mode & CRYPTO_LOCK) {
+	rb_nativethread_lock_lock(lock);
+    } else {
+	rb_nativethread_lock_unlock(lock);
+    }
 }
 
+static void
+ossl_lock_callback(int mode, int type, const char *file, int line)
+{
+    ossl_lock_unlock(mode, &ossl_locks[type]);
+}
+
+struct CRYPTO_dynlock_value {
+    rb_nativethread_lock_t lock;
+};
+
+static struct CRYPTO_dynlock_value *
+ossl_dyn_create_callback(const char *file, int line)
+{
+    struct CRYPTO_dynlock_value *dynlock = (struct CRYPTO_dynlock_value *)OPENSSL_malloc((int)sizeof(struct CRYPTO_dynlock_value));
+    rb_nativethread_lock_initialize(&dynlock->lock);
+    return dynlock;
+}
+
+static void
+ossl_dyn_lock_callback(int mode, struct CRYPTO_dynlock_value *l, const char *file, int line)
+{
+    ossl_lock_unlock(mode, &l->lock);
+}
+
+static void
+ossl_dyn_destroy_callback(struct CRYPTO_dynlock_value *l, const char *file, int line)
+{
+    rb_nativethread_lock_destroy(&l->lock);
+    OPENSSL_free(l);
+}
+
+#ifdef HAVE_CRYPTO_THREADID_PTR
+static void ossl_threadid_func(CRYPTO_THREADID *id)
+{
+    /* register native thread id */
+    CRYPTO_THREADID_set_pointer(id, (void *)rb_nativethread_self());
+}
+#else
 static unsigned long ossl_thread_id(void)
 {
-  return NUM2ULONG(rb_obj_id(rb_thread_current()));
+    /* before OpenSSL 1.0, this is 'unsigned long' */
+    return (unsigned long)rb_nativethread_self();
 }
+#endif
 
 static void Init_ossl_locks(void)
 {
-  int i;
-  ossl_locks = (VALUE*) OPENSSL_malloc(CRYPTO_num_locks() * sizeof(VALUE));
-  for (i = 0; i < CRYPTO_num_locks(); i++) {
-    ossl_locks[i] = rb_mutex_new();
-    rb_global_variable(&(ossl_locks[i]));
-  }
+    int i;
+    int num_locks = CRYPTO_num_locks();
 
-  CRYPTO_set_id_callback((unsigned long (*)())ossl_thread_id);
-  CRYPTO_set_locking_callback((void (*)())ossl_lock_callback);
+    if ((unsigned)num_locks >= INT_MAX / (int)sizeof(VALUE)) {
+	rb_raise(rb_eRuntimeError, "CRYPTO_num_locks() is too big: %d", num_locks);
+    }
+    ossl_locks = (rb_nativethread_lock_t *) OPENSSL_malloc(num_locks * (int)sizeof(rb_nativethread_lock_t));
+    if (!ossl_locks) {
+	rb_raise(rb_eNoMemError, "CRYPTO_num_locks() is too big: %d", num_locks);
+    }
+    for (i = 0; i < num_locks; i++) {
+	rb_nativethread_lock_initialize(&ossl_locks[i]);
+    }
+
+#ifdef HAVE_CRYPTO_THREADID_PTR
+    CRYPTO_THREADID_set_callback(ossl_threadid_func);
+#else
+    CRYPTO_set_id_callback(ossl_thread_id);
+#endif
+    CRYPTO_set_locking_callback(ossl_lock_callback);
+    CRYPTO_set_dynlock_create_callback(ossl_dyn_create_callback);
+    CRYPTO_set_dynlock_lock_callback(ossl_dyn_lock_callback);
+    CRYPTO_set_dynlock_destroy_callback(ossl_dyn_destroy_callback);
 }
 
 /*
@@ -788,7 +849,7 @@ static void Init_ossl_locks(void)
  *   cipher = OpenSSL::Cipher::Cipher.new 'AES-128-CBC'
  *
  *   open 'ca_key.pem', 'w', 0400 do |io|
- *     io.write key.export(cipher, pass_phrase)
+ *     io.write ca_key.export(cipher, pass_phrase)
  *   end
  *
  * === CA Certificate
@@ -1020,6 +1081,11 @@ Init_openssl()
      * Version of OpenSSL the ruby OpenSSL extension was built with
      */
     rb_define_const(mOSSL, "OPENSSL_VERSION", rb_str_new2(OPENSSL_VERSION_TEXT));
+
+    /*
+     * Version of OpenSSL the ruby OpenSSL extension is running with
+     */
+    rb_define_const(mOSSL, "OPENSSL_LIBRARY_VERSION", rb_str_new2(SSLeay_version(SSLEAY_VERSION)));
 
     /*
      * Version number of OpenSSL the ruby OpenSSL extension was built with

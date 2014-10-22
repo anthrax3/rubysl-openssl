@@ -31,9 +31,6 @@ if with_config("debug") or enable_config("debug")
   $defs.push("-DOSSL_DEBUG") unless $defs.include? "-DOSSL_DEBUG"
 end
 
-# Nothing we can do about these problems.
-$CPPFLAGS += " -Wno-deprecated-declarations -Wno-pointer-sign"
-
 Logging::message "=== Checking for system dependent stuff... ===\n"
 have_library("nsl", "t_open")
 have_library("socket", "socket")
@@ -60,6 +57,9 @@ end
 
 unless have_header("openssl/conf_api.h")
   raise "OpenSSL 0.9.6 or later required."
+end
+unless OpenSSL.check_func("SSL_library_init()", "openssl/ssl.h")
+  raise "Ignore OpenSSL broken by Apple.\nPlease use another openssl. (e.g. using `configure --with-openssl-dir=/path/to/openssl')"
 end
 
 Logging::message "=== Checking for OpenSSL features... ===\n"
@@ -144,6 +144,7 @@ if checking_for('OpenSSL version is 0.9.7 or later') {
   }
   have_header("openssl/ocsp.h")
 end
+have_struct_member("CRYPTO_THREADID", "ptr", "openssl/crypto.h")
 have_struct_member("EVP_CIPHER_CTX", "flags", "openssl/evp.h")
 have_struct_member("EVP_CIPHER_CTX", "engine", "openssl/evp.h")
 have_struct_member("X509_ATTRIBUTE", "single", "openssl/x509.h")
@@ -153,5 +154,7 @@ have_macro("EVP_CTRL_GCM_GET_TAG", ['openssl/evp.h']) && $defs.push("-DHAVE_AUTH
 Logging::message "=== Checking done. ===\n"
 
 create_header
-create_makefile("openssl/openssl")
+create_makefile("openssl/openssl") {|conf|
+  conf << "THREAD_MODEL = #{CONFIG["THREAD_MODEL"]}\n"
+}
 Logging::message "Done.\n"
