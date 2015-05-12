@@ -1,5 +1,5 @@
 /*
- * $Id$
+ * $Id: ossl_bn.c 48662 2014-12-01 06:38:04Z nobu $
  * 'OpenSSL for Ruby' project
  * Copyright (C) 2001-2002  Technorama team <oss-ruby@technorama.net>
  * All rights reserved.
@@ -15,11 +15,11 @@
   if (!(bn)) { \
     ossl_raise(rb_eRuntimeError, "BN wasn't initialized!"); \
   } \
-  (obj) = Data_Wrap_Struct((klass), 0, BN_clear_free, (bn)); \
+  (obj) = TypedData_Wrap_Struct((klass), &ossl_bn_type, (bn)); \
 } while (0)
 
 #define GetBN(obj, bn) do { \
-  Data_Get_Struct((obj), BIGNUM, (bn)); \
+  TypedData_Get_Struct((obj), BIGNUM, &ossl_bn_type, (bn)); \
   if (!(bn)) { \
     ossl_raise(rb_eRuntimeError, "BN wasn't initialized!"); \
   } \
@@ -29,6 +29,25 @@
   OSSL_Check_Kind((obj), cBN); \
   GetBN((obj), (bn)); \
 } while (0)
+
+static void
+ossl_bn_free(void *ptr)
+{
+    BN_clear_free(ptr);
+}
+
+static size_t
+ossl_bn_size(const void *ptr)
+{
+    return sizeof(BIGNUM);
+}
+
+static const rb_data_type_t ossl_bn_type = {
+    "OpenSSL/BN",
+    {0, ossl_bn_free, ossl_bn_size,},
+    0, 0,
+    RUBY_TYPED_FREE_IMMEDIATELY,
+};
 
 /*
  * Classes
@@ -140,19 +159,24 @@ ossl_bn_initialize(int argc, VALUE *argv, VALUE self)
 	return self;
     }
     else if (RB_TYPE_P(str, T_BIGNUM)) {
-        int len = rb_big_bytes_used(str);
-        unsigned char* bin = (unsigned char*)XMALLOC(len);
+        size_t len = rb_absint_size(str, NULL);
+	unsigned char *bin;
+	VALUE buf;
+        int sign;
 
-        rb_big_pack(str, (unsigned long*)bin, len / sizeof(long));
+        if (INT_MAX < len) {
+            rb_raise(eBNError, "bignum too long");
+        }
+        bin = (unsigned char*)ALLOCV_N(unsigned char, buf, len);
+        sign = rb_integer_pack(str, bin, len, 1, 0, INTEGER_PACK_BIG_ENDIAN);
 
-        GetBN(self, bn);
-	if (!BN_bin2bn(bin, len, bn)) {
-	    XFREE(bin);
+	GetBN(self, bn);
+	if (!BN_bin2bn(bin, (int)len, bn)) {
+	    ALLOCV_END(buf);
 	    ossl_raise(eBNError, NULL);
 	}
-        XFREE(bin);
-
-	if (!RBIGNUM_SIGN(str)) BN_set_negative(bn, 1);
+	ALLOCV_END(buf);
+	if (sign < 0) BN_set_negative(bn, 1);
 	return self;
     }
     if (RTEST(rb_obj_is_kind_of(str, cBN))) {
@@ -768,7 +792,7 @@ ossl_bn_is_prime_fasttest(int argc, VALUE *argv, VALUE self)
  * (NOTE: ordering of methods is the same as in 'man bn')
  */
 void
-Init_ossl_bn()
+Init_ossl_bn(void)
 {
 #if 0
     mOSSL = rb_define_module("OpenSSL"); /* let rdoc know about mOSSL */

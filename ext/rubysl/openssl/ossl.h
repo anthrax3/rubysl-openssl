@@ -1,5 +1,5 @@
 /*
- * $Id$
+ * $Id: ossl.h 44582 2014-01-13 00:57:42Z nobu $
  * 'OpenSSL for Ruby' project
  * Copyright (C) 2001-2002  Michal Rokos <m.rokos@sh.cvut.cz>
  * All rights reserved.
@@ -95,15 +95,15 @@ extern VALUE eOSSLError;
  */
 #define OSSL_Check_Kind(obj, klass) do {\
   if (!rb_obj_is_kind_of((obj), (klass))) {\
-    ossl_raise(rb_eTypeError, "wrong argument (%s)! (Expected kind of %s)",\
-               rb_obj_classname(obj), RSTRING_PTR(rb_class_name(klass)));\
+    ossl_raise(rb_eTypeError, "wrong argument (%"PRIsVALUE")! (Expected kind of %"PRIsVALUE")",\
+               rb_obj_class(obj), (klass));\
   }\
 } while (0)
 
 #define OSSL_Check_Instance(obj, klass) do {\
   if (!rb_obj_is_instance_of((obj), (klass))) {\
-    ossl_raise(rb_eTypeError, "wrong argument (%s)! (Expected instance of %s)",\
-               rb_obj_classname(obj), RSTRING_PTR(rb_class_name(klass)));\
+    ossl_raise(rb_eTypeError, "wrong argument (%"PRIsVALUE")! (Expected instance of %"PRIsVALUE")",\
+               rb_obj_class(obj), (klass));\
   }\
 } while (0)
 
@@ -137,8 +137,8 @@ VALUE ossl_x509name_sk2ary(STACK_OF(X509_NAME) *names);
 VALUE ossl_buf2str(char *buf, int len);
 #define ossl_str_adjust(str, p) \
 do{\
-    int len = RSTRING_LENINT(str);\
-    int newlen = rb_long2int((p) - (unsigned char*)RSTRING_PTR(str));\
+    long len = RSTRING_LEN(str);\
+    long newlen = (long)((p) - (unsigned char*)RSTRING_PTR(str));\
     assert(newlen <= len);\
     rb_str_set_len((str), newlen);\
 }while(0)
