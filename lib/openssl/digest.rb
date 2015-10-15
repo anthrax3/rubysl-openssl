@@ -56,7 +56,7 @@ module OpenSSL
     # Deprecated.
     #
     # This class is only provided for backwards compatibility.
-    class Digest < Digest # :nodoc:
+    class Digest < ::OpenSSL::Digest # :nodoc:
       # Deprecated.
       #
       # See OpenSSL::Digest.new
