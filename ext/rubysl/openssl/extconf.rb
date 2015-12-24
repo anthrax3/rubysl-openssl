@@ -1,18 +1,14 @@
 # -*- coding: us-ascii -*-
+# frozen_string_literal: false
 =begin
-= $RCSfile$ -- Generator for Makefile
-
 = Info
   'OpenSSL for Ruby 2' project
   Copyright (C) 2002  Michal Rokos <m.rokos@sh.cvut.cz>
   All rights reserved.
 
 = Licence
-  This program is licenced under the same licence as Ruby.
+  This program is licensed under the same licence as Ruby.
   (See the file 'LICENCE'.)
-
-= Version
-  $Id$
 =end
 
 require "mkmf"
@@ -59,7 +55,7 @@ unless have_header("openssl/conf_api.h")
   raise "OpenSSL 0.9.6 or later required."
 end
 unless OpenSSL.check_func("SSL_library_init()", "openssl/ssl.h")
-  Logging::message "You may be using a version of OpenSSL or SSL provided by Apple.\nIf you encounter issues, please use another SSL library. (e.g. using `configure --with-openssl-dir=/path/to/openssl')"
+  raise "Ignore OpenSSL broken by Apple.\nPlease use another openssl. (e.g. using `configure --with-openssl-dir=/path/to/openssl')"
 end
 
 Logging::message "=== Checking for OpenSSL features... ===\n"
@@ -87,6 +83,7 @@ have_func("HMAC_CTX_init")
 have_func("PEM_def_callback")
 have_func("PKCS5_PBKDF2_HMAC")
 have_func("PKCS5_PBKDF2_HMAC_SHA1")
+have_func("RAND_egd")
 have_func("X509V3_set_nconf")
 have_func("X509V3_EXT_nconf_nid")
 have_func("X509_CRL_add0_revoked")
@@ -112,6 +109,7 @@ have_func("TLSv1_1_client_method")
 have_func("TLSv1_2_method")
 have_func("TLSv1_2_server_method")
 have_func("TLSv1_2_client_method")
+have_func("SSL_CTX_set_alpn_select_cb")
 have_macro("OPENSSL_NPN_NEGOTIATED", ['openssl/ssl.h']) && $defs.push("-DHAVE_OPENSSL_NPN_NEGOTIATED")
 unless have_func("SSL_set_tlsext_host_name", ['openssl/ssl.h'])
   have_macro("SSL_set_tlsext_host_name", ['openssl/ssl.h']) && $defs.push("-DHAVE_SSL_SET_TLSEXT_HOST_NAME")
@@ -157,7 +155,7 @@ have_macro("EVP_CTRL_GCM_GET_TAG", ['openssl/evp.h']) && $defs.push("-DHAVE_AUTH
 Logging::message "=== Checking done. ===\n"
 
 create_header
-create_makefile("openssl/openssl") {|conf|
+create_makefile("openssl") {|conf|
   conf << "THREAD_MODEL = #{CONFIG["THREAD_MODEL"]}\n"
 }
 Logging::message "Done.\n"
