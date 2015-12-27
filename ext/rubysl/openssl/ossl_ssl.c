@@ -806,7 +806,7 @@ ossl_sslctx_setup(VALUE self)
     }
 #endif
 
-#ifdef HAVE_SSL_CTX_SET_ALPN_SELECT_CB
+#ifdef HAVE_SSL_CTX_SET_ALPN_PROTOS
     val = rb_iv_get(self, "@alpn_protocols");
     if (!NIL_P(val)) {
 	VALUE rprotos = ssl_encode_npn_protocols(val);
