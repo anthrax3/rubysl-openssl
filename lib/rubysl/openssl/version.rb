@@ -1,5 +1,5 @@
 module RubySL
   module OpenSSL
-    VERSION = "2.8.0"
+    VERSION = "2.9"
   end
 end
